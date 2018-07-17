@@ -2478,90 +2478,91 @@ def compile_(toolchain=None, target=None, profile=False, compile_library=False, 
         return
 
     target = program.get_target(target)
-    tchain = program.get_toolchain(toolchain)
-    macros = program.get_macros()
+    for t in target.split(","):
+        tchain = program.get_toolchain(toolchain)
+        macros = program.get_macros()
 
-    if compile_config:
-        # Compile configuration
-        popen([python_cmd, os.path.join(tools_dir, 'get_config.py')]
-              + ['-t', tchain, '-m', target]
-              + list(chain.from_iterable(zip(repeat('--profile'), profile or [])))
-              + list(chain.from_iterable(zip(repeat('--source'), source)))
-              + (['-v'] if verbose else [])
-              + (list(chain.from_iterable(zip(repeat('--prefix'), config_prefix))) if config_prefix else []),
-              env=env)
-    else:
-        # If the user hasn't supplied a build directory, ignore the default build directory
-        if not build:
-            program.ignore_build_dir()
-
-        build_path = build
-
-        if compile_library:
-            # Compile as a library (current dir is default)
-            if not build_path:
-                build_path = os.path.join(os.path.relpath(program.path, orig_path), program.build_dir, 'libraries', os.path.basename(orig_path), target.upper(), tchain.upper())
-
-            popen([python_cmd, '-u', os.path.join(tools_dir, 'build.py')]
-                  + list(chain.from_iterable(zip(repeat('-D'), macros)))
-                  + ['-t', tchain, '-m', target]
-                  + list(chain.from_iterable(zip(repeat('--profile'), profile or [])))
-                  + list(chain.from_iterable(zip(repeat('--source'), source)))
-                  + ['--build', build_path]
-                  + (['-c'] if clean else [])
-                  + (['--artifact-name', artifact_name] if artifact_name else [])
-                  + (['-v'] if verbose else [])
-                  + args,
-                  env=env)
+        if compile_config:
+            # Compile configuration
+            popen([python_cmd, os.path.join(tools_dir, 'get_config.py')]
+                + ['-t', tchain, '-m', t]
+                + list(chain.from_iterable(zip(repeat('--profile'), profile or [])))
+                + list(chain.from_iterable(zip(repeat('--source'), source)))
+                + (['-v'] if verbose else [])
+                + (list(chain.from_iterable(zip(repeat('--prefix'), config_prefix))) if config_prefix else []),
+                env=env)
         else:
-            # Compile as application (root is default)
-            if not build_path:
-                build_path = os.path.join(os.path.relpath(program.path, orig_path), program.build_dir, target.upper(), tchain.upper())
+            # If the user hasn't supplied a build directory, ignore the default build directory
+            if not build:
+                program.ignore_build_dir()
 
-            popen([python_cmd, '-u', os.path.join(tools_dir, 'make.py')]
-                  + list(chain.from_iterable(zip(repeat('-D'), macros)))
-                  + ['-t', tchain, '-m', target]
-                  + list(chain.from_iterable(zip(repeat('--profile'), profile or [])))
-                  + list(chain.from_iterable(zip(repeat('--source'), source)))
-                  + ['--build', build_path]
-                  + (['-c'] if clean else [])
-                  + (['--artifact-name', artifact_name] if artifact_name else [])
-                  + (['--app-config', app_config] if app_config else [])
-                  + (['-v'] if verbose else [])
-                  + args,
-                  env=env)
+            build_path = build
 
-            if flash or sterm:
-                try:
-                    from mbed_host_tests.host_tests_toolbox import flash_dev
-                except (IOError, ImportError, OSError):
-                    error("The '-f/--flash' option requires that the 'mbed-greentea' python module is installed.\nYou can install mbed-greentea by running \"%s -m pip install mbed-greentea\"." % python_cmd, 1)
+            if compile_library:
+                # Compile as a library (current dir is default)
+                if not build_path:
+                    build_path = os.path.join(os.path.relpath(program.path, orig_path), program.build_dir, 'libraries', os.path.basename(orig_path), t.upper(), tchain.upper())
 
-                connected = False
-                targets = program.get_detected_targets()
-                if targets:
-                    for _target in targets:
-                        if _target['name'] is None:
-                            continue
-                        elif _target['name'].upper() == target.upper():
-                            connected = _target
+                popen([python_cmd, '-u', os.path.join(tools_dir, 'build.py')]
+                    + list(chain.from_iterable(zip(repeat('-D'), macros)))
+                    + ['-t', tchain, '-m', t]
+                    + list(chain.from_iterable(zip(repeat('--profile'), profile or [])))
+                    + list(chain.from_iterable(zip(repeat('--source'), source)))
+                    + ['--build', build_path]
+                    + (['-c'] if clean else [])
+                    + (['--artifact-name', artifact_name] if artifact_name else [])
+                    + (['-v'] if verbose else [])
+                    + args,
+                    env=env)
+            else:
+                # Compile as application (root is default)
+                if not build_path:
+                    build_path = os.path.join(os.path.relpath(program.path, orig_path), program.build_dir, t.upper(), tchain.upper())
 
-                            # apply new firmware
-                            if flash:
-                                fw_name = artifact_name if artifact_name else program.name
-                                fw_fbase = os.path.join(build_path, fw_name)
-                                fw_file = fw_fbase + ('.hex' if os.path.exists(fw_fbase+'.hex') else '.bin')
-                                if not os.path.exists(fw_file):
-                                    error("Build program file (firmware) not found \"%s\"" % fw_file, 1)
-                                if not flash_dev(connected['mount'], fw_file, program_cycle_s=4):
-                                    error("Unable to flash the target board connected to your system.", 1)
+                popen([python_cmd, '-u', os.path.join(tools_dir, 'make.py')]
+                    + list(chain.from_iterable(zip(repeat('-D'), macros)))
+                    + ['-t', tchain, '-m', t]
+                    + list(chain.from_iterable(zip(repeat('--profile'), profile or [])))
+                    + list(chain.from_iterable(zip(repeat('--source'), source)))
+                    + ['--build', build_path]
+                    + (['-c'] if clean else [])
+                    + (['--artifact-name', artifact_name] if artifact_name else [])
+                    + (['--app-config', app_config] if app_config else [])
+                    + (['-v'] if verbose else [])
+                    + args,
+                    env=env)
 
-                            # reset board and/or connect to serial port
-                            if flash or sterm:
-                                mbed_sterm(connected['serial'], reset=flash, sterm=sterm)
+                if flash or sterm:
+                    try:
+                        from mbed_host_tests.host_tests_toolbox import flash_dev
+                    except (IOError, ImportError, OSError):
+                        error("The '-f/--flash' option requires that the 'mbed-greentea' python module is installed.\nYou can install mbed-greentea by running \"%s -m pip install mbed-greentea\"." % python_cmd, 1)
 
-                if not connected:
-                    error("The target board you compiled for is not connected to your system.\nPlease reconnect it and retry the last command.", 1)
+                    connected = False
+                    targets = program.get_detected_targets()
+                    if targets:
+                        for _target in targets:
+                            if _target['name'] is None:
+                                continue
+                            elif _target['name'].upper() == target.upper():
+                                connected = _target
+
+                                # apply new firmware
+                                if flash:
+                                    fw_name = artifact_name if artifact_name else program.name
+                                    fw_fbase = os.path.join(build_path, fw_name)
+                                    fw_file = fw_fbase + ('.hex' if os.path.exists(fw_fbase+'.hex') else '.bin')
+                                    if not os.path.exists(fw_file):
+                                        error("Build program file (firmware) not found \"%s\"" % fw_file, 1)
+                                    if not flash_dev(connected['mount'], fw_file, program_cycle_s=4):
+                                        error("Unable to flash the target board connected to your system.", 1)
+
+                                # reset board and/or connect to serial port
+                                if flash or sterm:
+                                    mbed_sterm(connected['serial'], reset=flash, sterm=sterm)
+
+                    if not connected:
+                        error("The target board you compiled for is not connected to your system.\nPlease reconnect it and retry the last command.", 1)
 
     program.set_defaults(target=target, toolchain=tchain)
 
